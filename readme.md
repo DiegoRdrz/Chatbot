@@ -1,19 +1,19 @@
 # Instrucciones de Instalación
 
-## 1. Clonar el repositorio
-git clone https://github.com/tu_usuario/tu_repositorio.git
-cd tu_repositorio
+## 1. Clonar el repo
+  git clone [https://github.com/tu_usuario/tu_repositorio.git](https://github.com/DiegoRdrz/Chatbot)
+  cd repo clonado
 
-## 2. Crear y activar un entorno virtual
-python -m venv env
-env\Scripts\activate
+## 2. Crear un entorno Voirtual 
+  python -m venv env
+  env\Scripts\activate
 
 ## 3. Instalar dependencias
-pip install gpt4all gradio
+  pip install gpt4all gradio
 
-# Ejecución del Chatbot
+# Ejecutar el chatbot
 
-## 1. Ejecuta la aplicación con:
+## 1. Comando
 python app.py
-## 2. Abre tu navegador y visita la URL:
+## 2. Navegador
 http://127.0.0.1:7860
