@@ -1,7 +1,7 @@
 # Instrucciones de Instalación
 
 ## 1. Clonar el repo
-  git clone [https://github.com/tu_usuario/tu_repositorio.git](https://github.com/DiegoRdrz/Chatbot)
+  git clone [https://github.com/DiegoRdrz/Chatbot](https://github.com/DiegoRdrz/Chatbot)
   cd repo clonado
 
 ## 2. Crear un entorno Voirtual 
