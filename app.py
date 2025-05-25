@@ -2,7 +2,7 @@ from gpt4all import GPT4All
 import gradio as gr
 
 # Carga automática del modelo instruccionado
-model = GPT4All("Meta-Llama-3--8BInstruct.Q4_0.gguf")
+model = GPT4All("Meta-Llama-3-8B-Instruct.Q4_0.gguf")
 
 def generate_response(user_input, history=None):
     if history is None:
