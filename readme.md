@@ -14,7 +14,7 @@
 ## OPCIONAL SI TIENEN NVIDIA
   -  Primero Instalar Nvidia CUDA
   -  Correr el comando
-      pip install llama-cpp-python --upgrade --extra-index-url https://jllllll.github.io/llama-cpp-python-cu117/
+      - pip install llama-cpp-python --upgrade --extra-index-url https://jllllll.github.io/llama-cpp-python-cu117/
 
 
 # Ejecutar el chatbot
