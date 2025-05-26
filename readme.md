@@ -9,10 +9,10 @@
   - env\Scripts\activate
 
 ## 3. Instalar dependencias
-  - pip install gpt4all gradioa}
+  - pip install gpt4all gradio
 
 ## OPCIONAL SI TIENEN NVIDIA
-  -  Primero Instalar Nvidia CUDA
+  -  Primero Instalar Nvidia CUDA VERSION 11.7
   -  Correr el comando
       - pip install llama-cpp-python --upgrade --extra-index-url https://jllllll.github.io/llama-cpp-python-cu117/
 
