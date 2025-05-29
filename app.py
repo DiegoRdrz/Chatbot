@@ -2,6 +2,10 @@ import os
 import json
 from gpt4all import GPT4All
 import gradio as gr
+import random
+
+
+from analyzer import analyze_text
 
 # Cargar modelo con manejo de errores
 try:
@@ -21,6 +25,10 @@ except Exception as e:
 # Directorio para guardar historial de sesiones
 HISTORY_DIR = "session_memory"
 os.makedirs(HISTORY_DIR, exist_ok=True)
+
+ANALYSIS_DIR = "session_analysis"
+os.makedirs(ANALYSIS_DIR, exist_ok=True)
+
 
 # Optimized instruction prompt for a psychiatrist chatbot
 INSTRUCTION = (
@@ -85,6 +93,23 @@ def load_history(session_id):
             return json.load(f)
     return []
 
+def save_analysis(session_id, result):
+    filepath = os.path.join(ANALYSIS_DIR, f"{session_id}.json")
+    data = []
+    if os.path.exists(filepath):
+        with open(filepath, "r") as f:
+            data = json.load(f)
+    data.append(result)
+    with open(filepath, "w") as f:
+        json.dump(data, f)
+
+def load_analysis(session_id):
+    filepath = os.path.join(ANALYSIS_DIR, f"{session_id}.json")
+    if os.path.exists(filepath):
+        with open(filepath, "r") as f:
+            return json.load(f)
+    return []
+
 # Función para formatear el historial de conversación
 def format_conversation(history, user_input):
     formatted_history = "\n".join(
@@ -118,6 +143,9 @@ def generate_response(user_input, session_id):
 
     history.append((user_input, response))
     save_history(session_id, history)
+
+    analysis_result = analyze_text(user_input)
+    save_analysis(session_id, analysis_result)
     return history, history
 
 # Función para reiniciar la sesión
@@ -127,28 +155,69 @@ def reset_session(session_id):
         os.remove(filepath)
     return [], []
 
+def finish_session(session_id):
+    if not session_id:
+        return "Please enter a Session ID."
+    
+    analysis = load_analysis(session_id)
+    if not analysis:
+        return "No analysis found for this session."
+
+    total = len(analysis)
+    negative_sentiment = sum(1 for a in analysis if a['sentiment'] == 'negative')
+    negative_emotion = sum(1 for a in analysis if a['emotion'] in ['sadness', 'fear', 'anger'])
+    depressive_intent = sum(1 for a in analysis if a['intent'] == 'express_negative_emotion')
+
+    score = (negative_sentiment + negative_emotion + depressive_intent) / (3 * total)
+    probability = round(score * 100, 2)
+
+    return f"Estimated probability of depression: {probability}%\n(based on {total} user messages)"
+
+# Lista para almacenar sesiones activas
+active_sessions = set()
+
+def generate_unique_session_id():
+    while True:
+        session_id = f"session_{random.randint(1000, 9999)}"
+        if session_id not in active_sessions:
+            active_sessions.add(session_id)
+            return session_id
+
 # Interfaz gráfica con Gradio
-with gr.Blocks() as demo:
-    chatbot = gr.Chatbot()
-    msg = gr.Textbox(label="Your message")
-    session_id = gr.Textbox(label="Session ID", placeholder="Enter a session ID (optional)")
-    clear = gr.Button("Clear")
+with gr.Blocks(css="body {background-color: #f9fafb;} .gr-button {font-size: 16px;}") as demo:
+    gr.Markdown("<h1 style='text-align: center; color: #333;'>PyscoBot: An AI Mental Health Assistant</h1>")
+
+    with gr.Row():
+        session_id = gr.Label(value=generate_unique_session_id(), label="Session ID")
+
+    with gr.Row():
+        chatbot = gr.Chatbot(label="Conversation", height=400)
+    
+    with gr.Row():
+        msg = gr.Textbox(label="Your message", placeholder="Write here and press Enter", lines=1)
+
+    with gr.Row():
+        clear = gr.Button("🧹 Clear Session")
+        finish = gr.Button("📊 Finish Session")
+
+    result_output = gr.Textbox(label="Depression Risk (after finishing)", interactive=False)
 
     history = gr.State([])
 
     def respond(user_input, session_id, history):
-        if session_id:
-            history = load_history(session_id)
+        if not session_id:
+            return gr.update(), history  # no response if session is empty
         history, updated_history = generate_response(user_input, session_id)
-        return updated_history, updated_history
+        return updated_history, ""
 
     def clear_session(session_id):
         if session_id:
             reset_session(session_id)
-        return [], []
+        return [], ""
 
-    msg.submit(respond, inputs=[msg, session_id, history], outputs=[chatbot, history])
-    clear.click(clear_session, inputs=[session_id], outputs=[chatbot, history])
+    msg.submit(respond, inputs=[msg, session_id, history], outputs=[chatbot, msg])
+    clear.click(clear_session, inputs=[session_id], outputs=[chatbot, msg])
+    finish.click(finish_session, inputs=[session_id], outputs=[result_output])
 
 # Ejecutar la aplicación
 if __name__ == "__main__":
