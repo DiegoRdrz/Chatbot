@@ -5,6 +5,8 @@ from transformers import pipeline
 from nltk.sentiment import SentimentIntensityAnalyzer
 import torch
 
+from suicide_phrases import contains_suicidal_phrase  
+
 
 
 # Descargar recursos necesarios para NLTK
@@ -59,8 +61,11 @@ def analyze_text(text):
     except Exception as e:
         intent = 'unknown'
 
+    suicidal_flag = contains_suicidal_phrase(text)
+
     return {
         'sentiment': sentiment,
         'emotion': emotion,
-        'intent': intent
+        'intent': intent,
+        'suicidal_phrase': suicidal_flag
     }

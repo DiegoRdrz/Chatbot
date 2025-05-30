@@ -1,0 +1,7 @@
+# Ignorar entorno virtual y cachés
+env/
+__pycache__/
+
+# Ignorar sesiones
+session_analysis/
+session_memory/

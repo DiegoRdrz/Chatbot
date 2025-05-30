@@ -153,8 +153,13 @@ def reset_session(session_id):
     filepath = os.path.join(HISTORY_DIR, f"{session_id}.json")
     if os.path.exists(filepath):
         os.remove(filepath)
+    # Eliminar análisis asociado a la sesión
+    filepath = os.path.join(ANALYSIS_DIR, f"{session_id}.json")
+    if os.path.exists(filepath):
+        os.remove(filepath)
     return [], []
 
+# Finalizar sesion
 def finish_session(session_id):
     if not session_id:
         return "Please enter a Session ID."
@@ -163,13 +168,63 @@ def finish_session(session_id):
     if not analysis:
         return "No analysis found for this session."
 
-    total = len(analysis)
-    negative_sentiment = sum(1 for a in analysis if a['sentiment'] == 'negative')
-    negative_emotion = sum(1 for a in analysis if a['emotion'] in ['sadness', 'fear', 'anger'])
-    depressive_intent = sum(1 for a in analysis if a['intent'] == 'express_negative_emotion')
+    active_messages = [
+        a for a in analysis if (
+            a.get('suicidal_phrase') or
+            a.get('sentiment') in ['positive', 'negative'] or
+            a.get('emotion') in ['joy', 'trust', 'sadness', 'fear', 'anger']
+        )
+    ]   
+    total = len(active_messages)
+    
+    if total == 0:
+        return "No messages found in this session."
 
-    score = (negative_sentiment + negative_emotion + depressive_intent) / (3 * total)
-    probability = round(score * 100, 2)
+    # Contadores mejorados (evitando doble conteo por mensaje)
+    suicide_flags = 0
+    negative_signals = 0
+    positive_signals = 0
+    
+    for a in analysis:
+        # Contar suicidio (máximo 1 por mensaje)
+        if a.get('suicidal_phrase'):
+            suicide_flags += 1
+        
+        # Señales negativas (máximo 1 por mensaje)
+        if (a.get('sentiment') == 'negative' or 
+            a.get('emotion') in ['sadness', 'fear', 'anger'] or 
+            a.get('intent') == 'express_negative_emotion'):
+            negative_signals += 1
+        
+        # Señales positivas (máximo 1 por mensaje)
+        if (a.get('sentiment') == 'positive' or 
+            a.get('emotion') in ['joy', 'trust'] or 
+            a.get('intent') == 'express_positive_emotion'):
+            positive_signals += 1
+
+    # Pesos
+    weight_suicide = 10 * suicide_flags
+    weight_negative = 1.0
+    weight_positive = -0.25
+
+    # Cálculo mejorado con máximos realistas
+    raw_score = (
+        (suicide_flags * weight_suicide) +
+        (negative_signals * weight_negative) +
+        (positive_signals * weight_positive)
+    )
+    
+    # Máximo teórico realista (todos los mensajes son suicidas + negativos)
+    max_possible = (weight_suicide + weight_negative) * total
+    # Mínimo teórico (todos los mensajes son p  ositivos)
+    min_possible = weight_positive * total
+    
+    # Normalización ajustada
+    if max_possible - min_possible <= 0:
+        probability = 0.0
+    else:
+        normalized = (raw_score - min_possible) / (max_possible - min_possible)
+        probability = round(max(0, min(normalized, 1)) * 100)
 
     return f"Estimated probability of depression: {probability}%\n(based on {total} user messages)"
 
@@ -185,10 +240,12 @@ def generate_unique_session_id():
 
 # Interfaz gráfica con Gradio
 with gr.Blocks(css="body {background-color: #f9fafb;} .gr-button {font-size: 16px;}") as demo:
-    gr.Markdown("<h1 style='text-align: center; color: #333;'>PyscoBot: An AI Mental Health Assistant</h1>")
+    gr.Markdown("<h1 style='text-align: center; color: #333;'>PsycoBot: An AI Mental Health Assistant</h1>")
 
     with gr.Row():
-        session_id = gr.Label(value=generate_unique_session_id(), label="Session ID")
+        session_id = gr.Label(label="Session ID")  # visible por defecto
+
+    history = gr.State([])
 
     with gr.Row():
         chatbot = gr.Chatbot(label="Conversation", height=400)
@@ -197,28 +254,37 @@ with gr.Blocks(css="body {background-color: #f9fafb;} .gr-button {font-size: 16p
         msg = gr.Textbox(label="Your message", placeholder="Write here and press Enter", lines=1)
 
     with gr.Row():
-        clear = gr.Button("🧹 Clear Session")
-        finish = gr.Button("📊 Finish Session")
+        clear = gr.Button("Clear Session")
+        finish = gr.Button("Finish Session")
 
     result_output = gr.Textbox(label="Depression Risk (after finishing)", interactive=False)
 
-    history = gr.State([])
-
+    # Función de respuesta
     def respond(user_input, session_id, history):
         if not session_id:
-            return gr.update(), history  # no response if session is empty
+            return gr.update(), history
         history, updated_history = generate_response(user_input, session_id)
         return updated_history, ""
 
+    # Función para limpiar sesión
     def clear_session(session_id):
         if session_id:
             reset_session(session_id)
         return [], ""
 
+    # Función para inicializar sesión al cargar
+    def initialize_session():
+        sid = generate_unique_session_id()
+        return sid, []
+
+    # Conexiones
     msg.submit(respond, inputs=[msg, session_id, history], outputs=[chatbot, msg])
     clear.click(clear_session, inputs=[session_id], outputs=[chatbot, msg])
     finish.click(finish_session, inputs=[session_id], outputs=[result_output])
 
+    # Inicializar valores al cargar
+    demo.load(fn=initialize_session, inputs=[], outputs=[session_id, history])
+
 # Ejecutar la aplicación
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(share=True)
